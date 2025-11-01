@@ -1,0 +1,102 @@
+openapi: 3.0.3
+info:
+  title: Image Service API
+  version: 1.0.0
+  description: >
+    LocalStack-backed AWS Lambda API for uploading, listing, and deleting images.
+servers:
+  - url: http://localhost:4566/restapis/{apiId}/local/_user_request_
+    variables:
+      apiId:
+        default: YOUR_LOCALSTACK_API_ID
+paths:
+  /upload:
+    post:
+      summary: Upload an image
+      description: Uploads an image file and stores its metadata.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadImageRequest'
+      responses:
+        '201':
+          description: Image uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadImageResponse'
+        '400':
+          description: Bad request
+        '500':
+          description: Server error
+
+  /list:
+    post:
+      summary: List all images
+      responses:
+        '200':
+          description: A list of image metadata
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ImageMetadata'
+
+  /delete:
+    post:
+      summary: Delete an image
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteImageRequest'
+      responses:
+        '200':
+          description: Successfully deleted
+        '404':
+          description: Not found
+
+components:
+  schemas:
+    UploadImageRequest:
+      type: object
+      properties:
+        filename:
+          type: string
+        content_base64:
+          type: string
+        content_type:
+          type: string
+      required: [filename, content_base64]
+    UploadImageResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        s3_key:
+          type: string
+        filename:
+          type: string
+    DeleteImageRequest:
+      type: object
+      properties:
+        id:
+          type: string
+      required: [id]
+    ImageMetadata:
+      type: object
+      properties:
+        id:
+          type: string
+        filename:
+          type: string
+        s3_key:
+          type: string
+        size_bytes:
+          type: integer
+        created_at:
+          type: integer

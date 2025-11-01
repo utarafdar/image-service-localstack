@@ -1,0 +1,67 @@
+# -------------------------------
+# General
+# -------------------------------
+*.log
+tmp/
+logs/
+*.pid
+*.bak
+
+# -------------------------------
+# LocalStack
+# -------------------------------
+.localstack/
+.localstack-volume/
+localstack_logs/
+
+# -------------------------------
+# Python
+# -------------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Virtual environments
+.env
+.venv
+venv/
+env/
+
+# Poetry
+poetry.lock
+# If you prefer to commit lockfile, comment above line out
+
+# -------------------------------
+# IDE / OS files
+# -------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# -------------------------------
+# Lambda packages & artifacts
+# -------------------------------
+*.zip
+*.tar.gz
+*.whl
+/tmp/
+
+# -------------------------------
+# Testing / Coverage
+# -------------------------------
+.coverage
+htmlcov/
+.tox/
+pytest_cache/
+
+# -------------------------------
+# Docker and Compose extras
+# -------------------------------
+docker-compose.override.yml
