@@ -15,23 +15,57 @@ Design highlights
 - S3 -> SQS -> Lambda: S3 object-created events delivered to SQS; a worker Lambda consumes SQS messages and marks DDB items as UPLOADED.
 - Idempotent deploy script: scripts/deploy_localstack.sh creates or reuses resources so local development is repeatable.
 
-What's implemented (src)
-------------------------
-- src/common/aws_clients.py
-  - boto3_client(...) configured for LocalStack
-  - deserialize_item(s) with Decimal -> int/float conversion
+Design Decisions
+---------------
+- Presigned S3 URLs: offloads large file transfer from Lambdas and backend, reduces cost and latency.
+- DynamoDB metadata: simple, scalable NoSQL store for per-user image metadata.
+- SQS between S3 and Lambda: reliable, decoupled processing of S3-created events (eventually consistent upload confirmation).
+- Idempotent deploy script: creating resources only when missing makes local development repeatable.
+- Small modular Lambdas: single responsibility functions, easier to test.
 
-- src/lambdas/upload_images/handler.py
-  - Generates presigned PUT URL, writes a DDB item with status="PENDING_UPLOAD" and s3_key.
+Project layout 
+--------------------------------
+- src/
+  - common/aws_clients.py          — shared boto3 client creation + DynamoDB deserialization helpers
+  - lambdas/
+    - upload_images/handler.py     — returns presigned PUT URL; writes DDB item with status `PENDING_UPLOAD`
+    - list_images/handler.py       — lists user's images (filters: filename substring, content_type); paginated; returns presigned GET only when status == `UPLOADED`
+    - delete_images/handler.py     — deletes DDB item; deletes S3 object only when status == `UPLOADED`
+    - s3_listener/handler.py       — triggered via SQS (S3 => SQS); reads S3 key, updates DDB item status -> `UPLOADED`
+- scripts/
+  - deploy_localstack.sh           — main idempotent deploy script (creates S3, DDB, API, Lambdas, SQS, bucket notification, event mappings)
+  - deploy_config.sh               — configuration for which Lambdas and env vars to deploy
+  - update_lambda.sh               — update lambda code (when changing only code)
+  - start_localstack.sh / teardown_localstack.sh — helpers around LocalStack lifecycle
+- docker-compose.yml               — LocalStack and test runner services
+- docker-test.Dockerfile           — test runner image to run pytest inside Docker (no local test installs needed)
+- tests/                           — unit tests (in repo; run in Docker)
 
-- src/lambdas/list_images/handler.py
-  - Query DDB for user images (filter by filename substring and/or content_type). Pagination (max 10). For items with status == "UPLOADED" returns S3 info and a presigned GET URL. For others returns metadata only.
+Lambda Implementation Details
+-----------------------------------
+- upload_images.handler
+  - Input: user_id, filename, content_type
+  - Action: generate presigned PUT URL, create DDB item:
+    - status = "PENDING_UPLOAD"
+    - created_at timestamp, s3_key
+  - Response: upload URL + metadata
+  - Logging: debug + warnings for malformed requests
 
-- src/lambdas/delete_images/handler.py
-  - Deletes DDB item and deletes S3 object only when status == "UPLOADED".
+- list_images.handler
+  - Input: user_id (required), optional filename (substring), content_type (exact), page_token
+  - Action: Query DynamoDB (KeyCondition user_id) + optional FilterExpressions; paginates (max 10)
+  - Response: list items; for items with status == "UPLOADED" include bucket, s3_key and presigned GET; otherwise omit S3 fields
+  - Logging: request, filters, query param debug
 
-- src/lambdas/s3_listener/handler.py
-  - Triggered via SQS (S3 notifications forwarded to SQS). Parses S3 key and updates DDB status -> "UPLOADED".
+- delete_images.handler
+  - Input: user_id, image_id
+  - Action: Fetch DDB item; if status == "UPLOADED" delete object from S3; delete item from DDB; return result booleans
+  - Logging: per-step debug & exception logs
+
+- s3_listener.handler
+  - Trigger: SQS messages (S3 notifications forwarded into SQS)
+  - Action: Parse S3 event(s), derive user_id & image_id from key format, update DDB status -> "UPLOADED"
+  - Logging: message-by-message processing results
 
 LocalStack deployment
 ---------------------
