@@ -1,0 +1,66 @@
+{
+  "info": {
+    "name": "Image Service (LocalStack)",
+    "_postman_id": "image-service-localstack-collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Upload - get presigned PUT",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"user_id\":\"alice\",\"filename\":\"pic.png\",\"content_type\":\"image/png\"}"
+        },
+        "url": {
+          "raw": "http://localhost:4566/restapis/{{API_ID}}/local/_user_request_/uploadImages",
+          "host": ["http://localhost:4566/restapis/{{API_ID}}/local/_user_request_"],
+          "path": ["uploadImages"]
+        }
+      }
+    },
+    {
+      "name": "List images (GET)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:4566/restapis/{{API_ID}}/local/_user_request_/listImages?user_id=alice",
+          "host": ["http://localhost:4566/restapis/{{API_ID}}/local/_user_request_"],
+          "path": ["listImages"],
+          "query": [
+            { "key": "user_id", "value": "alice" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Delete image",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"user_id\":\"alice\",\"image_id\":\"<image_id>\"}"
+        },
+        "url": {
+          "raw": "http://localhost:4566/restapis/{{API_ID}}/local/_user_request_/deleteImages",
+          "host": ["http://localhost:4566/restapis/{{API_ID}}/local/_user_request_"],
+          "path": ["deleteImages"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "API_ID",
+      "value": "REPLACE_WITH_API_ID",
+      "type": "string"
+    }
+  ]
+}

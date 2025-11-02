@@ -17,3 +17,14 @@ services:
       interval: 5s
       timeout: 10s
       retries: 10
+  tests:
+    build:
+      context: .
+      dockerfile: docker-test.Dockerfile
+    container_name: image-service-tests
+    volumes:
+      - ./:/app:cached
+    environment:
+      - PYTHONPATH=/app/src
+    tty: false
+    stdin_open: false

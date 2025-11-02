@@ -1,102 +1,184 @@
 openapi: 3.0.3
 info:
-  title: Image Service API
-  version: 1.0.0
-  description: >
-    LocalStack-backed AWS Lambda API for uploading, listing, and deleting images.
+  title: Image Service (LocalStack)
+  version: "1.0.0"
+  description: |
+    Local Image Service API (Upload, List, Delete).
+    - Upload returns presigned PUT URL.
+    - List returns metadata and presigned GET URL for UPLOADED items.
 servers:
-  - url: http://localhost:4566/restapis/{apiId}/local/_user_request_
+  - url: "http://localhost:4566/restapis/{api_id}/local/_user_request_"
     variables:
-      apiId:
-        default: YOUR_LOCALSTACK_API_ID
+      api_id:
+        default: "REPLACE_WITH_API_ID"
+        description: "API Gateway ID provided by deploy_localstack.sh"
 paths:
-  /upload:
+  /uploadImages:
     post:
-      summary: Upload an image
-      description: Uploads an image file and stores its metadata.
+      summary: Request a presigned PUT URL and create metadata entry (PENDING_UPLOAD)
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UploadImageRequest'
+              $ref: '#/components/schemas/UploadRequest'
       responses:
-        '201':
-          description: Image uploaded
+        '200':
+          description: Presigned upload URL and metadata
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UploadImageResponse'
+                $ref: '#/components/schemas/UploadResponse'
         '400':
           description: Bad request
-        '500':
-          description: Server error
-
-  /list:
-    post:
-      summary: List all images
-      responses:
-        '200':
-          description: A list of image metadata
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ImageMetadata'
-
-  /delete:
-    post:
-      summary: Delete an image
+                $ref: '#/components/schemas/Error'
+  /listImages:
+    get:
+      summary: List images for a user (filters + pagination). Presigned GET returned only for UPLOADED items.
+      parameters:
+        - in: query
+          name: user_id
+          schema:
+            type: string
+          required: true
+        - in: query
+          name: filename
+          schema:
+            type: string
+          required: false
+          description: Substring match on filename
+        - in: query
+          name: content_type
+          schema:
+            type: string
+          required: false
+          description: Exact content-type match (e.g. image/png)
+        - in: query
+          name: page_token
+          schema:
+            type: string
+          required: false
+          description: Token for pagination
+      responses:
+        '200':
+          description: Paginated list of images
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListResponse'
+        '400':
+          description: Missing user_id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /deleteImages:
+    delete:
+      summary: Delete an image (remove DDB item; remove S3 object only when status == UPLOADED)
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DeleteImageRequest'
+              $ref: '#/components/schemas/DeleteRequest'
       responses:
         '200':
-          description: Successfully deleted
+          description: Delete result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteResponse'
         '404':
           description: Not found
-
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 components:
   schemas:
-    UploadImageRequest:
+    UploadRequest:
       type: object
+      required: [user_id, filename, content_type]
       properties:
-        filename:
+        user_id:
           type: string
-        content_base64:
+        filename:
           type: string
         content_type:
           type: string
-      required: [filename, content_base64]
-    UploadImageResponse:
+    UploadResponse:
       type: object
       properties:
-        id:
+        upload_url:
+          type: string
+          description: Presigned PUT URL for direct upload to S3
+        image_id:
           type: string
         s3_key:
           type: string
-        filename:
-          type: string
-    DeleteImageRequest:
-      type: object
-      properties:
-        id:
-          type: string
-      required: [id]
-    ImageMetadata:
-      type: object
-      properties:
-        id:
-          type: string
-        filename:
-          type: string
-        s3_key:
-          type: string
-        size_bytes:
+        expires_in:
           type: integer
+    ImageItem:
+      type: object
+      properties:
+        image_id:
+          type: string
+        filename:
+          type: string
+        content_type:
+          type: string
         created_at:
           type: integer
+        status:
+          type: string
+          enum: [PENDING_UPLOAD, UPLOADED]
+        # only present when status == UPLOADED
+        bucket:
+          type: string
+        s3_key:
+          type: string
+        signed_url:
+          type: string
+          description: Presigned GET URL (only for UPLOADED items)
+    ListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageItem'
+        count:
+          type: integer
+        expires_in:
+          type: integer
+        next_page_token:
+          type: string
+    DeleteRequest:
+      type: object
+      required: [user_id, image_id]
+      properties:
+        user_id:
+          type: string
+        image_id:
+          type: string
+    DeleteResponse:
+      type: object
+      properties:
+        image_id:
+          type: string
+        user_id:
+          type: string
+        s3_key:
+          type: string
+        s3_deleted:
+          type: boolean
+        ddb_deleted:
+          type: boolean
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
